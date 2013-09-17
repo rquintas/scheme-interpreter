@@ -16,6 +16,9 @@
 (defn quoted? [exp]
     (tagged-list? exp 'quote))
 
+(defn text-of-quotation [exp]
+    (second exp))
+
 (defn assignment? [exp]
     (tagged-list? exp 'set!))
     
@@ -37,7 +40,7 @@
 (defn eval [exp env]
     (cond (self-evaluating? exp) exp
           (variable? exp) nil
-          (quoted? exp) nil
+          (quoted? exp) (text-of-quotation exp)
           (assignment? exp) nil
           (definition? exp) nil
           (if? exp) nil
@@ -55,4 +58,5 @@
 (defn -main [] 
     (foo "queijo")
     (self-evaluating? :a)
-    (quoted? (list 'quote "Queijo")))
+    (quoted? (list 'quote "Queijo"))
+    (eval (list 'quote "CACA") (list :a)))
