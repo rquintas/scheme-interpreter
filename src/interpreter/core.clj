@@ -1,5 +1,26 @@
 (ns interpreter.core)
 
+;; Application
+(defn application? [exp]
+    (list? exp))
+    
+(defn operator [exp]
+    (first exp))
+    
+(defn operands [exp]
+    (rest exp))
+
+(defn no-operands? [ops]
+    (empty? ops))
+    
+(defn first-operand [ops]
+    (first ops))
+    
+(defn rest-operands [ops]
+    (rest ops))
+    
+;;
+
 (defn tagged-list? [exp tag]
     (if (list? exp)
         (= (first exp) tag) 
@@ -81,19 +102,9 @@
 (defn cond? [exp]
     (tagged-list? exp 'cond))
 
-
-(defn no-operands? [ops]
-    (nil? ops))
-    
-(defn first-operand [ops]
-    (first ops))
-    
-(defn rest-operands [ops]
-    (rest ops))
-
 (defn list-of-values [exps env]
     (if (no-operands? exps)
-        nil
+        []
         (list (eval (first-operand exps) env)
               (list-of-values (rest-operands exps) env))))
 
@@ -117,8 +128,7 @@
 (defn first-frame [env]
     (first env))
     
-(defn the-empty-environment []
-    nil)
+(def the-empty-environment '())
 
 (defn make-frame [variables values]
     (atom (list variables values)))
@@ -173,10 +183,45 @@
         (scan (frame-variables frame)
               (frame-values frame))))
 
-;;; Evals
+;; Procedures
 
-(defn eval []
-    nil)
+(defn make-procedure [parameters body env]
+    (list 'procedure parameters body env))
+    
+(defn compound-procedure? [p]
+    (tagged-list? p 'procedure))
+    
+(defn procedure-parameters [p]
+    (nth p 1))
+    
+(defn procedure-body [p]
+    (nth p 2))
+    
+(defn procedure-environment [p]
+    (nth p 3))
+
+(defn primitive-procedure? [proc]
+    (tagged-list? proc 'primitive))
+    
+(defn primitive-implementation [proc]
+    (nth proc 1))
+
+(def primitive-procedures
+    (list (list '+ +)
+          (list '- -)
+          (list '* *)
+          (list '/ /)))
+
+(defn primitive-procedure-names []
+    (map first primitive-procedures))
+    
+(defn primitive-procedure-objects []
+    (map (fn [proc] (atom (list 'primitive (second proc)))) primitive-procedures))
+    
+(defn apply-primitive-procedure [proc args]
+    (clojure.core/apply (primitive-implementation proc) args))
+
+;;; Evals
 
 (defn eval-if [exp env]
     (if (true? (eval (if-predicate exp) env))
@@ -198,6 +243,14 @@
                       (eval (definition-value exp) env)
                       env))
 
+(defn apply [procedure arguments]
+     (cond (primitive-procedure? procedure) (apply-primitive-procedure procedure arguments)
+           (compound-procedure? procedure) (eval-sequence (procedure-body procedure)
+                                                          (extend-environment (procedure-parameters procedure)
+                                                                              arguments
+                                                                              (procedure-environment procedure)))
+       :else (print "Unknown procedure type -- APPLY")))
+                                
 (defn eval [exp env]
     (cond (self-evaluating? exp) exp
           (variable? exp) (lookup-variable-value exp env)
@@ -205,11 +258,37 @@
           (assignment? exp) (eval-assignment exp env)
           (definition? exp) (eval-definition exp env)
           (if? exp) (eval-if exp env)
-          (lambda? exp) nil
+          (lambda? exp) (make-procedure (lambda-parameters exp)
+                                        (lambda-body exp)
+                                        env)
           ;(begin? exp) (eval-sequence (begin-actions exp) env)
           (cond? exp) nil
-          ;(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))
+          (application? exp) 
+            (apply (eval (operator exp) env) (vec (flatten (list-of-values (operands exp) env))))
           :else "Unknown expression type -- EVAL"))
+
+(defn list-of-values [exps env]
+    (if (no-operands? exps)
+        '()
+        (list (eval (first-operand exps) env)
+              (list-of-values (rest-operands exps) env))))
+         
+;; Apply
+
+
+
+         
+         
+(defn setup-environment []
+    (let [initial-env (extend-environment (primitive-procedure-names)
+                                          (primitive-procedure-objects)
+                                          the-empty-environment)]
+         (do
+             (define-variable! 'true true initial-env)
+             (define-variable! 'false false initial-env)
+             initial-env)))
+             
+(def the-global-environment (setup-environment))
           
 (defn foo
   "I don't do a whole lot."
