@@ -99,7 +99,7 @@
 
 
 (defn last-exp? [seq]
-    (nil? (second seq)))
+    (empty? (rest seq)))
     
 (defn first-exp [seq]
     (first seq))
@@ -108,26 +108,6 @@
     (rest seq))
 
 
-;(defn eval-if [exp env]
-;    (if (true? (eval (if-predicate exp) env))
-;        (eval (if-consequent exp) env)
-;        (eval (if-alternative exp) env)))
-;        
-;(defn eval-sequence [exps env]
-;    (cond (last-exp? exps) (eval (first-exp exps) env)
-;          :else (do (eval (first-exp exps) env)
-;                    (eval-sequence (rest-exps exps) env))))
-;                    
-;(defn eval-assignment [exp env]
-;    (set-variable-value! (assignment-variable exp)
-;                         (eval (assignment-value exp) env)
-;                         env))
-;
-;(defn eval-definition [exp env]
-;    (define-variable! (definition-variable exp)
-;                      (eval (definition-value exp) env)
-;                      env))
-;
 
 ;; Environment
 
@@ -193,18 +173,43 @@
         (scan (frame-variables frame)
               (frame-values frame))))
 
+;;; Evals
+
+(defn eval []
+    nil)
+
+(defn eval-if [exp env]
+    (if (true? (eval (if-predicate exp) env))
+        (eval (if-consequent exp) env)
+        (eval (if-alternative exp) env)))
+        
+(defn eval-sequence [exps env]
+    (cond (last-exp? exps) (eval (first-exp exps) env)
+          :else (do (eval (first-exp exps) env)
+                    (eval-sequence (rest-exps exps) env))))
+                    
+(defn eval-assignment [exp env]
+    (set-variable-value! (assignment-variable exp)
+                         (eval (assignment-value exp) env)
+                         env))
+
+(defn eval-definition [exp env]
+    (define-variable! (definition-variable exp)
+                      (eval (definition-value exp) env)
+                      env))
+
 (defn eval [exp env]
     (cond (self-evaluating? exp) exp
-          (variable? exp) nil
+          (variable? exp) (lookup-variable-value exp env)
           (quoted? exp) (text-of-quotation exp)
-          (assignment? exp) nil
-          (definition? exp) nil
-          (if? exp) nil
+          (assignment? exp) (eval-assignment exp env)
+          (definition? exp) (eval-definition exp env)
+          (if? exp) (eval-if exp env)
           (lambda? exp) nil
-          (begin? exp) nil
+          ;(begin? exp) (eval-sequence (begin-actions exp) env)
           (cond? exp) nil
-          ;(application? exp) nil
-          :else nil))
+          ;(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))
+          :else "Unknown expression type -- EVAL"))
           
 (defn foo
   "I don't do a whole lot."
