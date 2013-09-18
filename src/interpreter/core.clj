@@ -66,7 +66,7 @@
     (nth exp 2))
     
 (defn if-alternative [exp]
-    (if (not (null? (nth exp 3)))
+    (if (not (nil? (nth exp 3)))
         (nth exp 3)
         'false))
 
@@ -82,33 +82,116 @@
     (tagged-list? exp 'cond))
 
 
+(defn no-operands? [ops]
+    (nil? ops))
+    
+(defn first-operand [ops]
+    (first ops))
+    
+(defn rest-operands [ops]
+    (rest ops))
+
 (defn list-of-values [exps env]
     (if (no-operands? exps)
         nil
         (list (eval (first-operand exps) env)
               (list-of-values (rest-operands exps) env))))
 
-(defn eval-if [exp env]
-    (if (true? (eval (if-predicate exp) env))
-        (eval (if-consequent exp) env)
-        (eval (if-alternative exp) env)))
-        
-(defn eval-sequence [exps env]
-    (cond (last-exp? exps) (eval (first-exp exps) env)
-          :else (do (eval (first-exp exps) env)
-                    (eval-sequence (rest-exps exps) env))))
-                    
-(defn eval-assignment [exp env]
-    (set-variable-value! (assignment-variable exp)
-                         (eval (assignment-value exp) env)
-                         env))
 
-(defn eval-definition [exp env]
-    (define-variable! (definition-variable exp)
-                      (eval (definition-value exp) env)
-                      env))
+(defn last-exp? [seq]
+    (nil? (second seq)))
+    
+(defn first-exp [seq]
+    (first seq))
+    
+(defn rest-exps [seq]
+    (rest seq))
 
 
+;(defn eval-if [exp env]
+;    (if (true? (eval (if-predicate exp) env))
+;        (eval (if-consequent exp) env)
+;        (eval (if-alternative exp) env)))
+;        
+;(defn eval-sequence [exps env]
+;    (cond (last-exp? exps) (eval (first-exp exps) env)
+;          :else (do (eval (first-exp exps) env)
+;                    (eval-sequence (rest-exps exps) env))))
+;                    
+;(defn eval-assignment [exp env]
+;    (set-variable-value! (assignment-variable exp)
+;                         (eval (assignment-value exp) env)
+;                         env))
+;
+;(defn eval-definition [exp env]
+;    (define-variable! (definition-variable exp)
+;                      (eval (definition-value exp) env)
+;                      env))
+;
+
+;; Environment
+
+(defn enclosing-environment [env]
+    (rest env))
+    
+(defn first-frame [env]
+    (first env))
+    
+(defn the-empty-environment []
+    nil)
+
+(defn make-frame [variables values]
+    (atom (list variables values)))
+    
+(defn frame-variables [frame]
+    (first @frame))
+    
+(defn frame-values [frame]
+    (second @frame))
+    
+(defn add-binding-to-frame! [var val frame]
+    (reset! frame (list (conj (first @frame) var) (conj (second @frame) (atom val)))))
+
+(defn extend-environment [vars vals base-env]
+    (if (= (count vars) (count vals))
+        (conj base-env (make-frame vars vals))
+        (if (< (count vars) (count vals))
+            (print "Too many arguments supplied")
+            (print "Too few arguments supplied"))))
+
+(defn lookup-variable-value [var env]
+    (defn env-loop [env]
+        (defn scan [vars vals]
+            (cond (empty? vars) (env-loop (enclosing-environment env))
+                  (= var (first vars)) @(first vals)
+                  :else (scan (rest vars) (rest vals))))
+        (if (empty? env)
+            (print "Unbound var")
+            (let [frame (first-frame env)]
+                (scan (frame-variables frame) (frame-values frame)))))
+    (env-loop env))
+
+
+(defn set-variable-value! [var val env]
+    (defn env-loop [env]
+        (defn scan [vars vals]
+            (cond (empty? vars) (env-loop (enclosing-environment env))
+                  (= var (first vars)) (reset! (first vals) val)
+                  :else (scan (rest vars) (rest vals))))
+        (if (empty? env)
+            (print "Unbound var -- SET")
+            (let [frame (first-frame env)]
+                (scan (frame-variables frame) (frame-values frame)))))
+    (env-loop env))
+    
+(defn define-variable! [var val env]
+    (let [frame (first-frame env)]
+        (defn scan [vars vals]
+            (cond (empty? vars) (add-binding-to-frame! var val frame)
+                  (= var (first vars)) (reset! (first vals) val)
+                  :else (scan (rest vars) (rest vals))))
+        (scan (frame-variables frame)
+              (frame-values frame))))
 
 (defn eval [exp env]
     (cond (self-evaluating? exp) exp
