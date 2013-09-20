@@ -99,8 +99,61 @@
 (defn begin? [exp]
     (tagged-list? exp 'begin))
 
+(defn begin-actions [exp]
+    (rest exp))
+
+(defn last-exp? [seq]
+    (empty? (rest seq)))
+
+(defn first-exp [seq]
+    (first seq))
+    
+(defn rest-exps [seq]
+    (rest seq))
+
+(defn make-begin [seq]
+    (list 'begin seq))
+
+(defn sequence->exp [seq]
+    (cond (nil? seq) seq
+          (last-exp? seq) (first-exp seq)
+          :else (make-begin seq)))
+
 (defn cond? [exp]
     (tagged-list? exp 'cond))
+
+
+(defn cond-clauses [exp]
+    (rest exp))
+
+(defn cond-predicate [clause]
+    (first clause))
+
+(defn cond-actions [clause]
+    (rest clause))
+
+(defn cond-else-clause? [clause]
+    (= (cond-predicate clause) 'else))
+
+(defn expand-clauses [clauses]
+    (if (nil? clauses)
+        'false
+        (let [car (first clauses)
+              cdr (rest clauses)]
+              (if (cond-else-clause? car)
+                  (sequence->exp (cond-actions car))
+                  (print "ELSE clause isn't last -- COND -> IF"))
+              (make-if (cond-predicate car)
+                       (sequence->exp (cond-actions first))
+                       (expand-clauses cdr)))))
+
+(defn cond->if [exp]
+    (expand-clauses (cond-clauses exp)))
+        
+
+
+
+
 
 (defn list-of-values [exps env]
     (if (no-operands? exps)
@@ -261,8 +314,8 @@
           (lambda? exp) (make-procedure (lambda-parameters exp)
                                         (lambda-body exp)
                                         env)
-          ;(begin? exp) (eval-sequence (begin-actions exp) env)
-          (cond? exp) nil
+          (begin? exp) (eval-sequence (begin-actions exp) env)
+          (cond? exp) (eval (cond->if exp) env)
           (application? exp) 
             (apply (eval (operator exp) env) (vec (flatten (list-of-values (operands exp) env))))
           :else "Unknown expression type -- EVAL"))
@@ -289,7 +342,43 @@
              initial-env)))
              
 (def the-global-environment (setup-environment))
-          
+
+
+(def input-prompt ";;; M-Eval input:")
+(def output-prompt ";;; M-Eval value:")
+
+(defn prompt-for-input [string]
+    (do 
+        (print "\n")
+        (print "\n")
+        (print string)
+        (print "\n")
+        (flush)))
+        
+(defn announce-output [string]
+    (do
+        (print "\n")
+        (print string)
+        (print "\n")
+        (flush)))
+        
+(defn user-print [object]
+    (if (compound-procedure? object)
+        (print (list 'compound-procedure
+                     (procedure-parameters object)
+                     (procedure-body object)
+                     '<procedure-env>))
+        (print object)))
+
+(defn driver-loop []
+    (do
+        (prompt-for-input input-prompt)
+        (let [input (read)]
+            (let [output (eval input the-global-environment)]
+                (announce-output output-prompt)
+                (user-print output)))
+        (driver-loop)))
+
 (defn foo
   "I don't do a whole lot."
   [x]
@@ -299,4 +388,5 @@
     (foo "queijo")
     (self-evaluating? :a)
     (quoted? (list 'quote "Queijo"))
-    (eval (list 'quote "CACA") (list :a)))
+    ;(eval (list '+ 1 1) (list :a))
+    (driver-loop))
