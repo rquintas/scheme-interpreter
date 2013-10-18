@@ -1,6 +1,6 @@
 (ns interpreter.core)
 
-;; Application
+;; application
 (defn application? [exp]
     (list? exp))
     
@@ -19,7 +19,7 @@
 (defn rest-operands [ops]
     (rest ops))
     
-;;
+;; types
 
 (defn tagged-list? [exp tag]
     (if (list? exp)
@@ -74,8 +74,6 @@
         (nth exp 2)
         (make-lambda (nth exp 2)
                      (nth exp 3))))
-    
-
 
 (defn if? [exp]
     (tagged-list? exp 'if))
@@ -93,8 +91,6 @@
 
 (defn make-if [predicate consequent alternative]
     (list 'if predicate consequent alternative))
-    
-
 
 (defn begin? [exp]
     (tagged-list? exp 'begin))
@@ -122,7 +118,6 @@
 (defn cond? [exp]
     (tagged-list? exp 'cond))
 
-
 (defn cond-clauses [exp]
     (rest exp))
 
@@ -149,18 +144,6 @@
 
 (defn cond->if [exp]
     (expand-clauses (cond-clauses exp)))
-        
-
-
-
-
-
-(defn list-of-values [exps env]
-    (if (no-operands? exps)
-        []
-        (list (eval (first-operand exps) env)
-              (list-of-values (rest-operands exps) env))))
-
 
 (defn last-exp? [seq]
     (empty? (rest seq)))
@@ -170,8 +153,6 @@
     
 (defn rest-exps [seq]
     (rest seq))
-
-
 
 ;; Environment
 
@@ -237,6 +218,17 @@
               (frame-values frame))))
 
 ;; Procedures
+(def primitive-procedures
+    "Mapping of procedures in our interpreter to functions on the host language."
+    (list (list '+ +)
+          (list '- -)
+          (list '* *)
+          (list '/ /)
+          (list 'car first)
+          (list 'cdr second)
+          (list 'cons list)
+          (list 'null? nil?)
+          (list '= =)))
 
 (defn make-procedure [parameters body env]
     (list 'procedure parameters body env))
@@ -259,12 +251,6 @@
 (defn primitive-implementation [proc]
     (nth proc 1))
 
-(def primitive-procedures
-    (list (list '+ +)
-          (list '- -)
-          (list '* *)
-          (list '/ /)))
-
 (defn primitive-procedure-names []
     (map first primitive-procedures))
     
@@ -274,7 +260,9 @@
 (defn apply-primitive-procedure [proc args]
     (clojure.core/apply (primitive-implementation proc) args))
 
-;;; Evals
+;;; Eval/Apply
+
+(declare eval)
 
 (defn eval-if [exp env]
     (if (true? (eval (if-predicate exp) env))
@@ -303,6 +291,8 @@
                                                                               arguments
                                                                               (procedure-environment procedure)))
        :else (print "Unknown procedure type -- APPLY")))
+      
+(declare list-of-values)
                                 
 (defn eval [exp env]
     (cond (self-evaluating? exp) exp
@@ -325,68 +315,3 @@
         '()
         (list (eval (first-operand exps) env)
               (list-of-values (rest-operands exps) env))))
-         
-;; Apply
-
-
-
-         
-         
-(defn setup-environment []
-    (let [initial-env (extend-environment (primitive-procedure-names)
-                                          (primitive-procedure-objects)
-                                          the-empty-environment)]
-         (do
-             (define-variable! 'true true initial-env)
-             (define-variable! 'false false initial-env)
-             initial-env)))
-             
-(def the-global-environment (setup-environment))
-
-
-(def input-prompt ";;; M-Eval input:")
-(def output-prompt ";;; M-Eval value:")
-
-(defn prompt-for-input [string]
-    (do 
-        (print "\n")
-        (print "\n")
-        (print string)
-        (print "\n")
-        (flush)))
-        
-(defn announce-output [string]
-    (do
-        (print "\n")
-        (print string)
-        (print "\n")
-        (flush)))
-        
-(defn user-print [object]
-    (if (compound-procedure? object)
-        (print (list 'compound-procedure
-                     (procedure-parameters object)
-                     (procedure-body object)
-                     '<procedure-env>))
-        (print object)))
-
-(defn driver-loop []
-    (do
-        (prompt-for-input input-prompt)
-        (let [input (read)]
-            (let [output (eval input the-global-environment)]
-                (announce-output output-prompt)
-                (user-print output)))
-        (driver-loop)))
-
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
-
-(defn -main [] 
-    (foo "queijo")
-    (self-evaluating? :a)
-    (quoted? (list 'quote "Queijo"))
-    ;(eval (list '+ 1 1) (list :a))
-    (driver-loop))

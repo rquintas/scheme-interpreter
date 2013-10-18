@@ -1,13 +1,20 @@
 # interpreter
 
-A Clojure library designed to ... well, that part is up to you.
+A Scheme interpreter implemented in Clojure, following SICP Chapter 4. http://mitpress.mit.edu/sicp/full-text/book/book-Z-H-26.html#%_sec_4.1 
 
 ## Usage
 
-FIXME
+lein run
 
-## License
+Once in the REPL it can evaluate expressions like:
 
-Copyright © 2013 FIXME
+(+ 40 2)
+(- 48 6)
+(* 6 7)
+(/ 168 4)
 
-Distributed under the Eclipse Public License, the same as Clojure.
+(define x 21)
+(+ x x)
+
+(set! x 10)
+(+ (* x 4) 2)
